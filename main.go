@@ -76,6 +76,8 @@ func main() {
 		io.Copy(w, resp.Body)
 	})
 
+	// here we wrap the optimism op-node interface expectation of a "/healthz" endpoint
+	// and make it call the "/upcheck" endpoint of web3signer, proxying the request.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		client := http.Client{Timeout: 2 * time.Second}
 		resp, err := client.Get(web3SignerURL + "/upcheck")
