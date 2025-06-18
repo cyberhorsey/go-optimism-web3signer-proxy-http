@@ -57,6 +57,9 @@ func main() {
 		port = "9000"
 	}
 
+	certFile := os.Getenv("TLS_CERT_FILE")
+	keyFile := os.Getenv("TLS_KEY_FILE")
+
 	http.HandleFunc("/sign", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		var req SignRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -104,7 +107,12 @@ func main() {
 		w.Write([]byte("ok"))
 	}))
 
-	slog.Info("starting web3signer proxy", "port", port, "web3signerURL", web3SignerURL)
+	isHTTPS := certFile != "" && keyFile != ""
+	slog.Info("starting web3signer proxy", "port", port, "web3signerURL", web3SignerURL, "isHTTPS", isHTTPS)
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), nil))
+	if isHTTPS {
+		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%v", port), certFile, keyFile, nil))
+	} else {
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), nil))
+	}
 }
