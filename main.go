@@ -30,6 +30,21 @@ type JSONRPCResponse struct {
 	Error   interface{} `json:"error,omitempty"`
 }
 
+func withCORS(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		handler(w, r)
+	}
+}
+
 func main() {
 	web3SignerURL := os.Getenv("WEB3SIGNER_URL")
 	if web3SignerURL == "" {
@@ -42,7 +57,7 @@ func main() {
 		port = "9000"
 	}
 
-	http.HandleFunc("/sign", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/sign", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		var req SignRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -74,11 +89,11 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.StatusCode)
 		io.Copy(w, resp.Body)
-	})
+	}))
 
 	// here we wrap the optimism op-node interface expectation of a "/healthz" endpoint
 	// and make it call the "/upcheck" endpoint of web3signer, proxying the request.
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/healthz", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		client := http.Client{Timeout: 2 * time.Second}
 		resp, err := client.Get(web3SignerURL + "/upcheck")
 		if err != nil || resp.StatusCode != 200 {
@@ -87,7 +102,7 @@ func main() {
 		}
 		w.WriteHeader(200)
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	slog.Info("starting web3signer proxy", "port", port, "web3signerURL", web3SignerURL)
 
